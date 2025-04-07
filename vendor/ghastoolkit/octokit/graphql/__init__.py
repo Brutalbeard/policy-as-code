@@ -30,7 +30,7 @@ DEPENDENCY_GRAPH_ALERTS = """\
                     securityAdvisory {
                         ghsaId
                         severity
-                        cwes(first: 100) {
+                        cwes(first: 50) {
                             edges {
                                 node {
                                     cweId
