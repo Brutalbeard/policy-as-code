@@ -63,6 +63,11 @@ thresholds.add_argument("--action", default="break")
 thresholds.add_argument("--severity", default="Error")
 thresholds.add_argument("--list-severities", action="store_true")
 thresholds.add_argument("--count", type=int, default=-1)
+thresholds.add_argument(
+    "--check-all-alerts",
+    action="store_true",
+    help="Check all alerts in the repository, not just PR-specific ones",
+)
 
 
 if __name__ == "__main__":

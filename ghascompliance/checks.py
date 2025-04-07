@@ -33,6 +33,7 @@ class Checks:
         caching: bool = True,
         retry_count: int = 240,
         retry_sleep: int = 15,
+        check_all_alerts: bool = False,
     ):
         self.policy = policy
 
@@ -44,6 +45,8 @@ class Checks:
         # Retry count and sleep for Code Scanning
         self.retry_count = retry_count
         self.retry_sleep = retry_sleep
+        # Option to check all alerts, not just PR-specific ones
+        self.check_all_alerts = check_all_alerts
 
         os.makedirs(self.results, exist_ok=True)
 
@@ -91,7 +94,7 @@ class Checks:
             Octokit.info("Code Scanning is not active in the policy")
             return 0
 
-        if GitHub.repository.isInPullRequest():
+        if GitHub.repository.isInPullRequest() and not self.check_all_alerts:
             Octokit.info("Code Scanning Alerts from Pull Request (alert diff)")
             Octokit.info(
                 f"Code Scanning retries enabled :: x{self.retry_count}/{self.retry_sleep}s"
@@ -100,11 +103,12 @@ class Checks:
                 GitHub.repository.getPullRequestInfo().get("base", {}).get("ref", "")
             )
             alerts = codescanning.getAlertsInPR(pr_base)
-
         else:
             Octokit.debug(
                 f"Code Scanning Alerts from reference :: {GitHub.repository.reference}"
             )
+            if GitHub.repository.isInPullRequest() and self.check_all_alerts:
+                Octokit.info("Checking all Code Scanning alerts, not just PR-specific ones")
             alerts = codescanning.getAlerts("open", ref=GitHub.repository.reference)
 
         Octokit.info("Total Code Scanning Alerts :: " + str(len(alerts)))
@@ -198,7 +202,7 @@ class Checks:
 
         depgraph = DependencyGraph()
 
-        if GitHub.repository.isInPullRequest():
+        if GitHub.repository.isInPullRequest() and not self.check_all_alerts:
             Octokit.info("Dependabot Alerts from Pull Request")
             pr_info = GitHub.repository.getPullRequestInfo()
             pr_base = pr_info.get("base", {}).get("ref", "")
@@ -209,8 +213,9 @@ class Checks:
             alerts = []
             for dep in dependencies:
                 alerts.extend(dep.alerts)
-
         else:
+            if GitHub.repository.isInPullRequest() and self.check_all_alerts:
+                Octokit.info("Checking all Dependabot alerts, not just PR-specific ones")
             # Alerts
             try:
                 alerts = dependabot.getAlerts("open")
@@ -324,13 +329,15 @@ class Checks:
 
         # TODO: Check if enabled
 
-        if GitHub.repository.isInPullRequest():
+        if GitHub.repository.isInPullRequest() and not self.check_all_alerts:
             Octokit.info("Dependencies from Pull Request")
             pr_info = GitHub.repository.getPullRequestInfo()
             pr_base = pr_info.get("base", {}).get("ref", "")
             pr_head = pr_info.get("head", {}).get("ref", "")
             dependencies = depgraph.getDependenciesInPR(pr_base, pr_head)
         else:
+            if GitHub.repository.isInPullRequest() and self.check_all_alerts:
+                Octokit.info("Checking all dependencies, not just PR-specific ones")
             dependencies = depgraph.getDependencies()
 
         # license data
@@ -468,7 +475,7 @@ class Checks:
 
         # TODO: Check if DependencyGraph is enabled in GitHub
 
-        if GitHub.repository.isInPullRequest():
+        if GitHub.repository.isInPullRequest() and not self.check_all_alerts:
             Octokit.info("Dependencies from Pull Request")
             pr_info = GitHub.repository.getPullRequestInfo()
             pr_base = pr_info.get("base", {}).get("ref", "")
@@ -476,6 +483,8 @@ class Checks:
             dependencies = depgraph.getDependenciesInPR(pr_base, pr_head)
 
         else:
+            if GitHub.repository.isInPullRequest() and self.check_all_alerts:
+                Octokit.info("Checking all dependencies, not just PR-specific ones")
             dependencies = depgraph.getDependencies()
 
         Octokit.info("Total Dependency Graph :: " + str(len(dependencies)))
@@ -537,10 +546,12 @@ class Checks:
             secret_violations.append(["Secret Scanning not enabled", ""])
             return 1
 
-        if GitHub.repository.isInPullRequest():
+        if GitHub.repository.isInPullRequest() and not self.check_all_alerts:
             Octokit.info("Secret Scanning Alerts from Pull Request")
             alerts = secretscanning.getAlertsInPR()
         else:
+            if GitHub.repository.isInPullRequest() and self.check_all_alerts:
+                Octokit.info("Checking all Secret Scanning alerts, not just PR-specific ones")
             alerts = secretscanning.getAlerts("open")
 
         Octokit.info("Total Secret Scanning Alerts :: " + str(len(alerts)))

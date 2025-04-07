@@ -42,6 +42,10 @@ inputs:
   argvs:
     description: "Additional Arguments"
 
+  check-all-alerts:
+    description: "Check all alerts in the repository, not just PR-specific ones"
+    default: "false"
+
 runs:
   using: "composite"
   steps:
@@ -60,4 +64,5 @@ runs:
           --github-policy-path "${{ inputs.policy-path }}" \
           --github-policy-branch "${{ inputs.policy-branch }}" \
           --retry-count "${{ inputs.retries }}" \
+          ${{ inputs.check-all-alerts == 'true' && '--check-all-alerts' || '' }} \
           ${{ inputs.argvs }}
