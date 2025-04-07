@@ -202,7 +202,7 @@ if __name__ == "__main__":
     checks = [
         ("code_scanning", checks.checkCodeScanning),
         ("dependabot", checks.checkDependabot),
-        ("dependencies", checks.checkDependencies),
+        # ("dependencies", checks.checkDependencies),
         ("dependency_licensing", checks.checkDependencyLicensing),
         ("secret_scanning", checks.checkSecretScanning),
     ]
