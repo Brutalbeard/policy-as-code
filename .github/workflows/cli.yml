@@ -36,7 +36,8 @@ jobs:
             --github-policy-path "policy.yml" `
             --github-repository "advanced-security/policy-as-code-testing" `
             --github-ref "refs/heads/main" `
-            --github-token "${{ secrets.POLICY_AS_CODE_TESTING_TOKEN }}"
+            --github-token "${{ secrets.POLICY_AS_CODE_TESTING_TOKEN }}" `
+            --check-all-alerts
             
 
       - name: "Run CLI (Linux / Macos)"
@@ -49,6 +50,7 @@ jobs:
             --github-policy-path "policy.yml" \
             --github-repository "advanced-security/policy-as-code-testing" \
             --github-ref "refs/heads/main" \
-            --github-token "${{ secrets.POLICY_AS_CODE_TESTING_TOKEN }}"
+            --github-token "${{ secrets.POLICY_AS_CODE_TESTING_TOKEN }}" \
+            --check-all-alerts 
 
 

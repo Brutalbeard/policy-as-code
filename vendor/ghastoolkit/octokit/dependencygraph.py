@@ -6,6 +6,7 @@ import urllib.parse
 
 from semantic_version import Version
 
+from ghastoolkit.errors import GHASToolkitError, GHASToolkitTypeError
 from ghastoolkit.octokit.github import GitHub, Repository
 from ghastoolkit.supplychain.advisories import Advisory
 from ghastoolkit.supplychain.dependencyalert import DependencyAlert
@@ -70,7 +71,7 @@ class DependencyGraph:
                 logger.warning("Using GraphQL API to resolve dependencies (GHES 3.6+)")
                 deps = self.getDependenciesGraphQL()
             else:
-                raise Exception("Enterprise Server version must be >= 3.6.0")
+                raise GHASToolkitError("Enterprise Server version must be >= 3.6.0")
         else:
             # cloud: download SBOM
             deps = self.getDependenciesSbom()
@@ -126,52 +127,121 @@ class DependencyGraph:
 
         return result
 
-    def getDependenciesGraphQL(self) -> Dependencies:
-        """Get Dependencies from GraphQL."""
+    def getDependenciesGraphQL(self, dependencies_count: int = 100) -> Dependencies:
+        """Get Dependencies from GraphQL.
+
+        This functions requests each manifest file in the repository and the
+        dependencies associated with it. It then paginates through both the manifests
+        and dependencies.
+
+        This is done to avoid the timeout errors in the GraphQL API when requesting
+        large projects with many manifests and dependencies.
+        """
         deps = Dependencies()
-        data = self.graphql.query(
-            "GetDependencyInfo",
-            {"owner": self.repository.owner, "repo": self.repository.repo},
-        )
-        graph_manifests = (
-            data.get("data", {})
-            .get("repository", {})
-            .get("dependencyGraphManifests", {})
-        )
-        logger.debug(
-            f"Graph Manifests Total Count :: {graph_manifests.get('totalCount')}"
-        )
 
-        for manifest in graph_manifests.get("edges", []):
-            node = manifest.get("node", {})
-            logger.debug(f"Processing :: '{node.get('filename')}'")
+        manifests = True
+        manifests_cursor = ""
+        dependencies_cursor = ""
 
-            for dep in node.get("dependencies", {}).get("edges", []):
-                dep = dep.get("node", {})
-                license = None
-                repository = None
+        while manifests:
+            # Query a single manifest at a time
+            data = self.graphql.query(
+                "GetDependencyInfo",
+                {
+                    "owner": self.repository.owner,
+                    "repo": self.repository.repo,
+                    "manifests_cursor": manifests_cursor,
+                    "dependencies_first": dependencies_count,
+                    "dependencies_cursor": dependencies_cursor,
+                },
+            )
 
-                if dep.get("repository"):
-                    if dep.get("repository", {}).get("licenseInfo"):
-                        license = (
-                            dep.get("repository", {}).get("licenseInfo", {}).get("name")
-                        )
-                    if dep.get("repository", {}).get("nameWithOwner"):
-                        repository = dep.get("repository", {}).get("nameWithOwner")
+            graph_manifests = (
+                data.get("data", {})
+                .get("repository", {})
+                .get("dependencyGraphManifests", {})
+            )
+            logger.debug(f"Processing :: '{graph_manifests.get('totalCount')}'")
 
-                version = dep.get("requirements")
-                if version:
-                    version = version.replace("= ", "")
+            # Runs at least once
+            has_next_page = True
 
-                deps.append(
-                    Dependency(
-                        name=dep.get("packageName"),
-                        manager=dep.get("packageManager"),
-                        version=version,
-                        license=license,
-                        repository=repository,
+            while has_next_page:
+                for manifest in graph_manifests.get("edges", []):
+                    node = manifest.get("node", {})
+                    dependencies = node.get("dependencies", {})
+                    logger.debug(f"Processing :: '{node.get('filename')}'")
+
+                    # Pagination
+                    has_next_page = dependencies.get("pageInfo", {}).get(
+                        "hasNextPage", False
                     )
-                )
+                    if has_next_page:
+                        dependencies_cursor = f'after: "{dependencies.get("pageInfo", {}).get("endCursor")}"'
+                    else:
+                        dependencies_cursor = ""
+
+                    for dep in dependencies.get("edges", []):
+                        dep = dep.get("node", {})
+                        license = None
+                        repository = None
+
+                        if dep.get("repository"):
+                            if dep.get("repository", {}).get("licenseInfo"):
+                                license = (
+                                    dep.get("repository", {})
+                                    .get("licenseInfo", {})
+                                    .get("name")
+                                )
+                            if dep.get("repository", {}).get("nameWithOwner"):
+                                repository = dep.get("repository", {}).get(
+                                    "nameWithOwner"
+                                )
+
+                        version = dep.get("requirements")
+                        if version:
+                            version = version.replace("= ", "")
+
+                        deps.append(
+                            Dependency(
+                                name=dep.get("packageName"),
+                                manager=dep.get("packageManager"),
+                                version=version,
+                                license=license,
+                                repository=repository,
+                            )
+                        )
+
+                if has_next_page:
+                    logger.debug(
+                        f"Re-run and fetch next data page :: {manifests_cursor} ({dependencies_cursor})"
+                    )
+
+                    data = self.graphql.query(
+                        "GetDependencyInfo",
+                        {
+                            "owner": self.repository.owner,
+                            "repo": self.repository.repo,
+                            "manifests_cursor": manifests_cursor,
+                            "dependencies_first": dependencies_count,
+                            "dependencies_cursor": dependencies_cursor,
+                        },
+                    )
+                    graph_manifests = (
+                        data.get("data", {})
+                        .get("repository", {})
+                        .get("dependencyGraphManifests", {})
+                    )
+
+            # If there are no other manifest files, then we are done
+            if graph_manifests.get("pageInfo", {}).get("hasNextPage"):
+                cursor = graph_manifests.get("pageInfo", {}).get("endCursor")
+                manifests_cursor = f'after: "{cursor}"' if cursor != "" else ""
+                logger.debug(f"Cursor :: {manifests_cursor}")
+            else:
+                manifests = False
+                manifests_cursor = ""
+                logger.debug("No more manifests to be processed")
 
         return deps
 
@@ -179,7 +249,7 @@ class DependencyGraph:
         """Get all the dependencies from a Pull Request."""
 
         if GitHub.isEnterpriseServer() and GitHub.server_version < Version("3.6.0"):
-            raise Exception("Enterprise Server version must be >= 3.6")
+            raise GHASToolkitError("Enterprise Server version must be >= 3.6")
 
         dependencies = Dependencies()
         base = urllib.parse.quote(base, safe="")
@@ -215,6 +285,8 @@ class DependencyGraph:
 
             for alert in depdata.get("vulnerabilities", []):
                 dep_alert = DependencyAlert(
+                    depdata.get("vulnerabilities").index(alert),
+                    "open",
                     alert.get("severity"),
                     purl=dep.getPurl(False),
                     advisory=Advisory(
@@ -223,6 +295,7 @@ class DependencyGraph:
                         summary=alert.get("advisory_summary"),
                         url=alert.get("advisory_ghsa_url"),
                     ),
+                    manifest=alert.get("manifest"),
                 )
                 dep.alerts.append(dep_alert)
 
@@ -231,8 +304,18 @@ class DependencyGraph:
         return dependencies
 
     def exportBOM(self) -> Dependencies:
-        """Download / Export DependencyGraph SBOM."""
-        return self.rest.get("/repos/{owner}/{repo}/dependency-graph/sbom")
+        """Download / Export DependencyGraph SBOM.
+
+        https://docs.github.com/en/rest/dependency-graph/sboms#export-a-software-bill-of-materials-sbom-for-a-repository
+        """
+        result = self.rest.get("/repos/{owner}/{repo}/dependency-graph/sbom")
+        if result:
+            return result
+
+        raise GHASToolkitTypeError(
+            "Failed to download SBOM",
+            docs="https://docs.github.com/en/rest/dependency-graph/sboms#export-a-software-bill-of-materials-sbom-for-a-repository",
+        )
 
     def submitDependencies(
         self,

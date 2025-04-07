@@ -2,7 +2,7 @@ import os
 import argparse
 import logging
 
-from ghastoolkit.octokit.github import GitHub
+from ghastoolkit import GitHub, GHASToolkitAuthenticationError
 
 from ghascompliance.__version__ import __name__ as tool_name, __banner__, __url__
 from ghascompliance.consts import SEVERITIES
@@ -50,6 +50,8 @@ github_arguments.add_argument(
     "--github-policy-path",
     default=os.path.join(HERE, "defaults", "policy.yml"),
 )
+github_arguments.add_argument("--retry-count", type=int, default=240)
+github_arguments.add_argument("--retry-sleep", type=int, default=15)
 
 thresholds = parser.add_argument_group("Thresholds")
 thresholds.add_argument(
@@ -61,6 +63,11 @@ thresholds.add_argument("--action", default="break")
 thresholds.add_argument("--severity", default="Error")
 thresholds.add_argument("--list-severities", action="store_true")
 thresholds.add_argument("--count", type=int, default=-1)
+thresholds.add_argument(
+    "--check-all-alerts",
+    action="store_true",
+    help="Check all alerts in the repository, not just PR-specific ones",
+)
 
 
 if __name__ == "__main__":
@@ -186,6 +193,8 @@ if __name__ == "__main__":
         display=arguments.display,
         results_path=results,
         caching=arguments.disable_caching,
+        retry_count=arguments.retry_count,
+        retry_sleep=arguments.retry_sleep,
     )
 
     errors = 0
@@ -203,8 +212,17 @@ if __name__ == "__main__":
             if not getattr(arguments, f"disable_{check[0]}"):
                 errors += check[1]()
 
+        except GHASToolkitAuthenticationError as err:
+            Octokit.error("Authentication Error")
+            Octokit.error(str(err))
+
+            errors += 1
+            # Add to summary
+            Summary.addLine(f"{Summary.__ICONS__['cross']} :: Authentication Error")
+            Summary.addLine(Summary.formatItalics(str(err)))
+
         except Exception as err:
-            Octokit.error("Unknown Exception was hit, please repo this to " + __url__)
+            Octokit.error("Unknown Exception was hit, please report this to " + __url__)
             Octokit.error(str(err))
 
             errors += 1  # add to error count

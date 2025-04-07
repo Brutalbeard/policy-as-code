@@ -3,6 +3,7 @@
 import logging
 from typing import Optional
 
+from ghastoolkit.errors import GHASToolkitError, GHASToolkitTypeError
 from ghastoolkit.octokit.github import GitHub, Repository
 from ghastoolkit.octokit.octokit import GraphQLRequest, RestRequest
 from ghastoolkit.supplychain.advisories import Advisory
@@ -39,10 +40,17 @@ class Dependabot:
         return False
 
     def isSecurityUpdatesEnabled(self) -> bool:
-        """Is Security Updates for Dependabot enabled."""
+        """Is Security Updates for Dependabot enabled.
+
+        https://docs.github.com/en/rest/reference/repos#get-a-repository
+        """
         result = self.rest.get("get/repos/{owner}/{repo}")
         if not isinstance(result, dict):
-            raise Exception(f"Unable to get repository info")
+            raise GHASToolkitTypeError(
+                "Unable to get repository info",
+                permissions=["Repository Administration (read)"],
+                docs="https://docs.github.com/en/rest/reference/repos#get-a-repository",
+            )
         saa = result.get("source", {}).get("security_and_analysis", {})
         status = saa.get("dependabot_security_updates", {}).get("status", "disabled")
         return status == "enabled"
@@ -58,10 +66,13 @@ class Dependabot:
     ) -> list[DependencyAlert]:
         """Get All Dependabot alerts from REST API.
 
-        https://docs.github.com/en/enterprise-cloud@latest/rest/dependabot/alerts?apiVersion=2022-11-28
+        https://docs.github.com/en/rest/dependabot/alerts
         """
         if state not in ["auto_dismissed", "dismissed", "fixed", "open"]:
-            raise Exception(f"Invalid state provided: {state}")
+            raise GHASToolkitError(
+                f"Invalid state provided: {state}",
+                docs="https://docs.github.com/en/rest/reference/repos#get-a-repository",
+            )
 
         logger.debug(f"Getting Dependabot alerts with state: {state}")
 
@@ -95,11 +106,43 @@ class Dependabot:
                         ),
                         advisory=advisory,
                         purl=f"pkg:{package.get('ecosystem')}/{package.get('name')}".lower(),
+                        manifest=alert.get("manifest_path"),
                     )
                 )
 
             return retval
-        raise Exception(f"Error getting Dependabot alerts")
+        raise GHASToolkitTypeError(
+            f"Error getting Dependabot alerts",
+            docs="https://docs.github.com/en/rest/dependabot/alerts",
+        )
+
+    def getAlertsInPR(self) -> list[DependencyAlert]:
+        """Get All Dependabot alerts from REST API in Pull Request."""
+        logger.debug("Dependabot Alerts from Pull Request using DependencyGraph API")
+
+        from ghastoolkit import DependencyGraph
+
+        depgraph = DependencyGraph(repository=self.repository)
+
+        pr_info = self.repository.getPullRequestInfo()
+        pr_base = pr_info.get("base", {}).get("ref", "")
+        pr_head = pr_info.get("head", {}).get("ref", "")
+
+        if pr_base == "" or pr_head == "":
+            raise GHASToolkitError(
+                "Failed to get base and head branch of pull request",
+                permissions=[
+                    '"Contents" repository permissions (read)',
+                    '"Pull requests" permissions (read)',
+                ],
+                docs="https://docs.github.com/en/rest/reference/repos#get-a-repository",
+            )
+
+        dependencies = depgraph.getDependenciesInPR(pr_base, pr_head)
+        alerts = []
+        for dep in dependencies:
+            alerts.extend(dep.alerts)
+        return alerts
 
     def getAlertsGraphQL(self) -> list[DependencyAlert]:
         """Get All Dependabot alerts from GraphQL API using the `GetDependencyAlerts` query."""
@@ -116,7 +159,8 @@ class Dependabot:
                 logger.error(
                     "This could be due to a lack of permissions or access token"
                 )
-                raise Exception(f"Failed to get GraphQL repository alerts")
+                raise GHASToolkitError(f"Failed to get GraphQL repository alerts")
+
             alerts = repo.get("vulnerabilityAlerts", {})
 
             for alert in alerts.get("edges", []):

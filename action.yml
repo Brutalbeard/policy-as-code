@@ -35,8 +35,16 @@ inputs:
     description: Policy as Code branch
     default: main
 
+  retries:
+    description: Number of times to retry the action
+    default: 240 # 1 hours worth of retries
+
   argvs:
     description: "Additional Arguments"
+
+  check-all-alerts:
+    description: "Check all alerts in the repository, not just PR-specific ones"
+    default: "false"
 
 runs:
   using: "composite"
@@ -55,4 +63,6 @@ runs:
           --github-policy "${{ inputs.policy }}" \
           --github-policy-path "${{ inputs.policy-path }}" \
           --github-policy-branch "${{ inputs.policy-branch }}" \
+          --retry-count "${{ inputs.retries }}" \
+          ${{ inputs.check-all-alerts == 'true' && '--check-all-alerts' || '' }} \
           ${{ inputs.argvs }}
