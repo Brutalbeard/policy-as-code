@@ -1,6 +1,6 @@
 {
     repository(owner: "$owner", name: "$repo") {
-        vulnerabilityAlerts(first: 100, states: [OPEN], $cursor) {
+        vulnerabilityAlerts(first: 50, states: [OPEN], $cursor) {
             totalCount
             pageInfo {
                 hasNextPage
@@ -19,7 +19,7 @@
                     securityAdvisory {
                         ghsaId
                         severity
-                        cwes(first: 100) {
+                        cwes(first: 50) {
                             edges {
                                 node {
                                     cweId
