@@ -195,6 +195,7 @@ if __name__ == "__main__":
         caching=arguments.disable_caching,
         retry_count=arguments.retry_count,
         retry_sleep=arguments.retry_sleep,
+        check_all_alerts=arguments.check_all_alerts,
     )
 
     errors = 0
