@@ -108,7 +108,9 @@ class Checks:
                 f"Code Scanning Alerts from reference :: {GitHub.repository.reference}"
             )
             if GitHub.repository.isInPullRequest() and self.check_all_alerts:
-                Octokit.info("Checking all Code Scanning alerts, not just PR-specific ones")
+                Octokit.info(
+                    "Checking all Code Scanning alerts, not just PR-specific ones"
+                )
             alerts = codescanning.getAlerts("open", ref=GitHub.repository.reference)
 
         Octokit.info("Total Code Scanning Alerts :: " + str(len(alerts)))
@@ -215,7 +217,9 @@ class Checks:
                 alerts.extend(dep.alerts)
         else:
             if GitHub.repository.isInPullRequest() and self.check_all_alerts:
-                Octokit.info("Checking all Dependabot alerts, not just PR-specific ones")
+                Octokit.info(
+                    "Checking all Dependabot alerts, not just PR-specific ones"
+                )
             # Alerts
             try:
                 alerts = dependabot.getAlerts("open")
@@ -551,7 +555,9 @@ class Checks:
             alerts = secretscanning.getAlertsInPR()
         else:
             if GitHub.repository.isInPullRequest() and self.check_all_alerts:
-                Octokit.info("Checking all Secret Scanning alerts, not just PR-specific ones")
+                Octokit.info(
+                    "Checking all Secret Scanning alerts, not just PR-specific ones"
+                )
             alerts = secretscanning.getAlerts("open")
 
         Octokit.info("Total Secret Scanning Alerts :: " + str(len(alerts)))

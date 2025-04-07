@@ -65,3 +65,4 @@ jobs:
       uses: ./
       with:
         token: "${{ secrets.POLICY_AS_CODE_TESTING_TOKEN }}"
+        check-all-alerts: true
