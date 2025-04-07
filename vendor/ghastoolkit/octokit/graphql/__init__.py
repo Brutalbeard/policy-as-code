@@ -9,7 +9,7 @@ DEPENDENCY_GRAPH_STATUS = """\
 DEPENDENCY_GRAPH_ALERTS = """\
 {
     repository(owner: "$owner", name: "$repo") {
-        vulnerabilityAlerts(first: 10, states: [OPEN], $cursor) {
+        vulnerabilityAlerts(first: 100, states: [OPEN], $cursor) {
             totalCount
             pageInfo {
                 hasNextPage
