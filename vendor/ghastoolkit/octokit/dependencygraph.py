@@ -127,7 +127,7 @@ class DependencyGraph:
 
         return result
 
-    def getDependenciesGraphQL(self, dependencies_count: int = 5) -> Dependencies:
+    def getDependenciesGraphQL(self, dependencies_count: int = 10) -> Dependencies:
         """Get Dependencies from GraphQL.
 
         This functions requests each manifest file in the repository and the

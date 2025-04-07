@@ -382,7 +382,7 @@ class GraphQLRequest:
         query = self.formatQuery(query_content, cursor=cursor, **options)
 
         response = self.session.post(
-            GitHub.api_graphql, json={"query": query}, timeout=60
+            GitHub.api_graphql, json={"query": query}, timeout=30
         )
         if response.status_code != 200:
             logger.error(f"GraphQL API Status :: {response.status_code}")
