@@ -51,8 +51,8 @@ jobs:
       with:
         action: continue
         token: "${{ secrets.POLICY_AS_CODE_TESTING_TOKEN }}"
-        policy: ./policy-as-code
-        policy-path: policy.yml
+        policy: Brutalbeard/policy-as-code
+        policy-path: examples/policies/basic.yml
         argvs: --display --github-repository Brutalbeard/policy-as-code --github-ref refs/heads/main
 
   action-test:
