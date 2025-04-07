@@ -50,6 +50,6 @@ jobs:
             --github-repository "advanced-security/policy-as-code-testing" \
             --github-ref "refs/heads/main" \
             --github-token "${{ secrets.POLICY_AS_CODE_TESTING_TOKEN }}" \
-            --check-all-alerts true 
+            --check-all-alerts 
 
 

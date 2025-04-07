@@ -24,4 +24,4 @@ vendor = "./vendor/update.sh"
 # tests / linting
 test = "python -m unittest discover -s ./tests -p 'test_*.py'"
 fmt = "black ghascompliance tests"
-lint = "black ghascompliance tests"
+lint = "black --check ghascompliance tests"
